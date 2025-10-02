@@ -1,0 +1,6 @@
+livekit
+livekit-api
+cerebras-cloud-sdk
+python-dotenv
+httpx
+numpy

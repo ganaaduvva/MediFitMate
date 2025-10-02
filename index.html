@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cerebras AI Assistant - Voice & Text</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-dot.connected {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.assistant {
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            white-space: pre-wrap;  /* Preserve line breaks and spacing */
+            animation: fadeIn 0.3s ease;
+        }
+
+        .message.user .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message.assistant .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+        }
+
+        .message-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .message-mode {
+            font-size: 10px;
+            background: #667eea;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        .input-area {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        #sendBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        #sendBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #voiceBtn {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            min-width: 120px;
+        }
+
+        #voiceBtn.active {
+            background: #ff4444;
+            border-color: #ff4444;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        #voiceBtn:hover:not(:disabled) {
+            background: #667eea;
+            color: white;
+        }
+
+        #connectBtn {
+            background: #00ff88;
+            color: #333;
+            margin-left: 10px;
+        }
+
+        #connectBtn:hover {
+            background: #00dd77;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 18px;
+            width: fit-content;
+            border: 1px solid #e0e0e0;
+        }
+
+        .typing-indicator.show {
+            display: flex;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #888;
+            animation: typingBounce 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes typingBounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #888;
+            padding: 40px 20px;
+        }
+
+        .empty-state h2 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Cerebras AI Assistant</h1>
+            <div class="status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Disconnected</span>
+                <button id="connectBtn" style="display: none;">Connect</button>
+            </div>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="empty-state">
+                <h2>👋 Welcome!</h2>
+                <p>Start a conversation by typing a message or using voice input</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input 
+                type="text" 
+                id="messageInput" 
+                placeholder="Type your message..." 
+                disabled
+            />
+            <button id="voiceBtn" disabled>
+                🎤 Voice
+            </button>
+            <button id="sendBtn" disabled>
+                Send
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@1.15.4/dist/livekit-client.umd.min.js"></script>
+    <script>
+        let room = null;
+        let isVoiceActive = false;
+        let isConnected = false;
+
+        const elements = {
+            messages: document.getElementById('messages'),
+            input: document.getElementById('messageInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            voiceBtn: document.getElementById('voiceBtn'),
+            connectBtn: document.getElementById('connectBtn'),
+            statusDot: document.getElementById('statusDot'),
+            statusText: document.getElementById('statusText')
+        };
+
+        // Auto-connect on page load
+        window.addEventListener('load', () => {
+            elements.connectBtn.style.display = 'inline-block';
+            connectToRoom();
+        });
+
+        async function connectToRoom() {
+            try {
+                updateStatus('connecting', 'Connecting...');
+                
+                room = new LivekitClient.Room();
+                
+                // Set up event listeners
+                room.on('connected', () => {
+                    updateStatus('connected', 'Connected');
+                    enableInputs();
+                    isConnected = true;
+                    elements.connectBtn.style.display = 'none';
+                });
+
+                room.on('disconnected', () => {
+                    updateStatus('disconnected', 'Disconnected');
+                    disableInputs();
+                    isConnected = false;
+                    elements.connectBtn.style.display = 'inline-block';
+                });
+
+                room.on('dataReceived', (payload, participant) => {
+                    const message = new TextDecoder().decode(payload);
+                    addMessage('assistant', message, 'text');
+                    hideTypingIndicator();
+                });
+
+                room.on('trackSubscribed', (track, publication, participant) => {
+                    if (track.kind === 'audio') {
+                        const audioElement = track.attach();
+                        audioElement.autoplay = true;
+                        document.body.appendChild(audioElement);
+                        
+                        // Show assistant is speaking
+                        showTypingIndicator('Speaking...');
+                        
+                        track.on('ended', () => {
+                            hideTypingIndicator();
+                        });
+                    }
+                });
+
+                // Use dev token for local file
+                const token = await getDevToken();
+                const wsUrl = 'wss://voice-agent-g5af7mn0.livekit.cloud';
+                
+                // Connect with options to enable data channel
+                await room.connect(wsUrl, token, {
+                    autoSubscribe: true
+                });
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                updateStatus('error', 'Connection failed');
+                addMessage('system', 'Connection failed. Check that agent is running and token is valid.', 'system');
+            }
+        }
+
+                        async function getDevToken() {
+            return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiVXNlciIsInZpZGVvIjp7InJvb21Kb2luIjp0cnVlLCJyb29tIjoiY2VyZWJyYXMtdm9pY2Utcm9vbSIsImNhblB1Ymxpc2giOnRydWUsImNhblN1YnNjcmliZSI6dHJ1ZSwiY2FuUHVibGlzaERhdGEiOnRydWV9LCJzdWIiOiJ1c2VyLTk4NWRiNjk1IiwiaXNzIjoiQVBJNnpOUkxnTE1IWmpRIiwibmJmIjoxNzU5Mzk2ODM5LCJleHAiOjE3NTk0MTg0Mzl9.ZXM9oG8AQXYExS2mXA62lC-G2BzDsR4NR7QPHIr6_gY';
+        }
+
+        async function sendTextMessage() {
+            const message = elements.input.value.trim();
+            if (!message || !isConnected) return;
+
+            addMessage('user', message, 'text');
+            elements.input.value = '';
+            
+            // Send via data channel
+            try {
+                await room.localParticipant.publishData(
+                    new TextEncoder().encode(message),
+                    LivekitClient.DataPacket_Kind.RELIABLE
+                );
+                console.log('Message sent successfully');
+            } catch (err) {
+                console.error('Failed to send message:', err);
+            }
+            
+            showTypingIndicator();
+        }
+
+        async function toggleVoice() {
+            if (!isConnected) return;
+
+            if (isVoiceActive) {
+                // Stop voice
+                await room.localParticipant.setMicrophoneEnabled(false);
+                elements.voiceBtn.classList.remove('active');
+                elements.voiceBtn.textContent = '🎤 Voice';
+                isVoiceActive = false;
+                
+                // Tell agent to disable voice processing
+                try {
+                    await room.localParticipant.publishData(
+                        new TextEncoder().encode('__VOICE_DISABLE__'),
+                        LivekitClient.DataPacket_Kind.RELIABLE
+                    );
+                    console.log('Voice disabled');
+                } catch (err) {
+                    console.error('Failed to disable voice:', err);
+                }
+            } else {
+                // Start voice
+                await room.localParticipant.setMicrophoneEnabled(true);
+                elements.voiceBtn.classList.add('active');
+                elements.voiceBtn.textContent = '⏹️ Stop';
+                isVoiceActive = true;
+                addMessage('system', '🎤 Voice activated! Speak for 3+ seconds...', 'system');
+                
+                // Tell agent to enable voice processing
+                try {
+                    await room.localParticipant.publishData(
+                        new TextEncoder().encode('__VOICE_ENABLE__'),
+                        LivekitClient.DataPacket_Kind.RELIABLE
+                    );
+                    console.log('Voice enabled');
+                } catch (err) {
+                    console.error('Failed to enable voice:', err);
+                }
+            }
+        }
+
+        function addMessage(sender, text, mode) {
+            // Remove empty state
+            const emptyState = elements.messages.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            const modeLabel = mode === 'voice' ? '🎤 Voice' : mode === 'text' ? '💬 Text' : '📢';
+            
+            messageDiv.innerHTML = `
+                <div class="message-label">
+                    ${sender === 'user' ? 'You' : sender === 'assistant' ? 'Assistant' : 'System'}
+                    ${mode !== 'system' ? `<span class="message-mode">${modeLabel}</span>` : ''}
+                </div>
+                <div class="message-bubble">${text}</div>
+            `;
+            
+            elements.messages.appendChild(messageDiv);
+            elements.messages.scrollTop = elements.messages.scrollHeight;
+        }
+
+        function showTypingIndicator(text = 'Thinking...') {
+            hideTypingIndicator();
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'message assistant';
+            indicator.id = 'typingIndicator';
+            indicator.innerHTML = `
+                <div class="message-label">Assistant</div>
+                <div class="typing-indicator show">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            `;
+            
+            elements.messages.appendChild(indicator);
+            elements.messages.scrollTop = elements.messages.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        function updateStatus(status, text) {
+            elements.statusText.textContent = text;
+            elements.statusDot.className = 'status-dot';
+            
+            if (status === 'connected') {
+                elements.statusDot.classList.add('connected');
+            }
+        }
+
+        function enableInputs() {
+            elements.input.disabled = false;
+            elements.sendBtn.disabled = false;
+            elements.voiceBtn.disabled = false;
+        }
+
+        function disableInputs() {
+            elements.input.disabled = true;
+            elements.sendBtn.disabled = true;
+            elements.voiceBtn.disabled = true;
+        }
+
+        // Event listeners
+        elements.sendBtn.addEventListener('click', sendTextMessage);
+        elements.input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendTextMessage();
+            }
+        });
+        elements.voiceBtn.addEventListener('click', toggleVoice);
+        elements.connectBtn.addEventListener('click', connectToRoom);
+    </script>
+</body>
+</html> 
