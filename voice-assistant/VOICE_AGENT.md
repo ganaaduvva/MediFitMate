@@ -1,16 +1,27 @@
-# Cerebras Multimodal AI Assistant with LiveKit
+# Health & Wellness AI Assistant with Voice Support
 
-A production-ready AI assistant powered by Cerebras AI that handles **both voice and text** conversations in real-time using LiveKit infrastructure.
+A specialized health and wellness assistant powered by Cerebras AI that provides **evidence-based health information** through both voice and text conversations. Built with LiveKit for real-time communication.
 
 ## 🎯 Features
 
-- ✅ **Text Chat** → Type messages and get instant AI responses
-- ✅ **Voice Chat** → Speak naturally and hear AI responses back
-- ✅ **Unified Conversation** → Text and voice share the same conversation history
-- ✅ **Beautiful Web UI** → Modern, responsive chat interface
-- ✅ **Modular Architecture** → Clean separation of concerns (LLM, STT, TTS, Agent)
-- ✅ **Voice Activity Detection** → Only processes audio when you're speaking
-- ✅ **Smart Formatting** → Clean, readable responses with proper spacing
+### Health & Wellness
+- 🏥 **Evidence-Based Information** → Accurate health and wellness guidance
+- 🧘 **Holistic Approach** → Physical health, mental wellbeing, nutrition, fitness
+- ⚕️ **Safe Practices** → Clear medical disclaimers and professional referrals
+- 🛡️ **Topic Validation** → Ensures discussions stay focused on health
+
+### Communication
+- 💬 **Text Chat** → Type health questions, get instant responses
+- 🎤 **Voice Chat** → Natural voice conversations about wellness
+- 🤝 **Unified History** → Text and voice share the same health discussion
+- 🎯 **Topic Focus** → Politely redirects non-health questions
+- 📝 **Clear Format** → Well-organized health information with proper spacing
+
+### Technical
+- 🏗️ **Modular Design** → Clean separation of health processing components
+- 🎯 **Keyword Detection** → Smart health topic validation
+- 🔍 **Voice Activity** → Only processes when you're speaking
+- 🖥️ **Modern UI** → Beautiful, responsive health chat interface
 
 ## 🏗️ Architecture
 

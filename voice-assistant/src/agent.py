@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from livekit import rtc, api
 from cerebras_handler import CerebrasHandler
 from voice_handler import VoiceHandler
+from health_assistant import HealthAssistant
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,9 @@ voice = VoiceHandler(
     deepgram_key=os.getenv("DEEPGRAM_API_KEY"),
     cartesia_key=os.getenv("CARTESIA_API_KEY")
 )
+
+# Initialize health assistant
+health = HealthAssistant()
 
 
 def generate_agent_token():
@@ -97,8 +101,28 @@ async def main():
                 response = "Conversation history cleared! Starting fresh. 🔄"
                 logging.info("🔄 History cleared")
             else:
-                # Generate response using Cerebras
-                response = cerebras.generate_response(ROOM_NAME, message)
+                # Process through health assistant first
+                health_response = await health.process_query(message)
+                
+                if "not directly related to health" in health_response:
+                    # Non-health topic detected
+                    response = health_response
+                    logging.info("🚫 Non-health topic redirected")
+                else:
+                    # Health topic - get Cerebras response with health context
+                    response = cerebras.generate_response(ROOM_NAME, message)
+                    
+                    # Validate the response
+                    valid, feedback = await health.validate_response(
+                        response,
+                        await health.classify_health_topic(message)
+                    )
+                    
+                    if not valid:
+                        logging.warning(f"⚠️ Response validation issues: {feedback}")
+                        # Add missing elements (disclaimers, referrals)
+                        response = f"{response}\n\nIMPORTANT: {health.disclaimers['general']['educational']}"
+                
                 logging.info(f"🤖 Response: {response[:100]}...")
             
             # Send response back via data channel
@@ -137,8 +161,28 @@ async def main():
             
             logging.info(f"📝 Transcript: {transcript}")
             
-            # Step 2: Generate response with Cerebras (reuses text pipeline!)
-            response_text = cerebras.generate_response(ROOM_NAME, transcript)
+            # Step 2: Process through health assistant
+            health_response = await health.process_query(transcript)
+            
+            if "not directly related to health" in health_response:
+                # Non-health topic detected
+                response_text = health_response
+                logging.info("🚫 Non-health topic redirected")
+            else:
+                # Health topic - get Cerebras response with health context
+                response_text = cerebras.generate_response(ROOM_NAME, transcript)
+                
+                # Validate the response
+                valid, feedback = await health.validate_response(
+                    response_text,
+                    await health.classify_health_topic(transcript)
+                )
+                
+                if not valid:
+                    logging.warning(f"⚠️ Response validation issues: {feedback}")
+                    # Add missing elements (disclaimers, referrals)
+                    response_text = f"{response_text}\n\nIMPORTANT: {health.disclaimers['general']['educational']}"
+            
             logging.info(f"🤖 Response: {response_text[:100]}...")
             
             # Step 3: Convert to speech with Cartesia

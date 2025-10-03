@@ -24,45 +24,27 @@ wheels/
 venv/
 env/
 ENV/
-.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # Environment variables
 .env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
 
 # Logs
 *.log
 logs/
-agent.log
-agent_output.log
-
-# LiveKit
-*.jwt
-
-# Temporary files
-*.tmp
-temp/
-tmp/
-
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
+log/
 
 # Testing
+.coverage
+htmlcov/
 .pytest_cache/
-<<<<<<< HEAD
-.tox/ 
-=======
-.tox/ 
->>>>>>> c235bf0 (Added my changes)
+.tox/
+
+# Misc
+.DS_Store
+Thumbs.db

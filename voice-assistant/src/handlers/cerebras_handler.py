@@ -72,8 +72,17 @@ class CerebrasHandler:
         self, 
         room_id: str, 
         user_message: str,
-        system_prompt: str = "You are a helpful assistant. Format your responses with clear paragraphs, bullet points for lists, and proper spacing for readability.",
-        max_tokens: int = 500,
+        system_prompt: str = """You are a helpful health and wellness assistant. When formatting your responses:
+1. Use clear paragraphs with proper spacing
+2. Use bullet points (•) for lists
+3. Include all details without truncation
+4. For meal plans and schedules:
+   - List each item on a new line
+   - Include all nutritional information
+   - Complete all sections fully
+5. Never leave responses incomplete
+6. Use proper line breaks between sections""",
+        max_tokens: int = 2000,  # Increased for longer responses
         temperature: float = 0.7
     ) -> str:
         """
