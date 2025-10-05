@@ -1,0 +1,42 @@
+{
+    "hypertension": {
+        "category": "cardiovascular",
+        "definition": "High blood pressure, a condition where the force of blood against artery walls is consistently too high",
+        "related_terms": ["blood pressure", "systolic", "diastolic"]
+    },
+    "diabetes": {
+        "category": "endocrine",
+        "definition": "A metabolic disorder that affects how the body processes blood sugar (glucose)",
+        "related_terms": ["blood sugar", "insulin", "glucose"]
+    },
+    "arthritis": {
+        "category": "musculoskeletal",
+        "definition": "Inflammation of one or more joints causing pain and stiffness",
+        "related_terms": ["joint pain", "inflammation", "rheumatoid"]
+    },
+    "asthma": {
+        "category": "respiratory",
+        "definition": "A condition where airways narrow and swell, producing extra mucus",
+        "related_terms": ["wheezing", "shortness of breath", "bronchial"]
+    },
+    "migraine": {
+        "category": "neurological",
+        "definition": "A headache disorder characterized by severe throbbing pain, often with other symptoms",
+        "related_terms": ["headache", "aura", "photophobia"]
+    },
+    "cholesterol": {
+        "category": "cardiovascular",
+        "definition": "A waxy substance found in blood, necessary for building cells but problematic in high amounts",
+        "related_terms": ["HDL", "LDL", "triglycerides"]
+    },
+    "anxiety": {
+        "category": "mental health",
+        "definition": "A mental health condition characterized by persistent worry and fear",
+        "related_terms": ["stress", "panic attack", "worry"]
+    },
+    "depression": {
+        "category": "mental health",
+        "definition": "A mood disorder causing persistent feelings of sadness and loss of interest",
+        "related_terms": ["mood", "sadness", "mental health"]
+    }
+}

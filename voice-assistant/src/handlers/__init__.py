@@ -1,4 +1,1 @@
-"""
-Voice Agent Handlers Package
-Contains all the core handlers for the voice agent
-"""
+# This file makes the handlers directory a Python package
