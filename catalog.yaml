@@ -1,0 +1,51 @@
+version: 2
+name: custom-mcp
+displayName: Custom MCP Catalog
+registry:
+  medical:
+    enabled: true
+    description: An MCP server providing medical information from FDA, WHO, PubMed, and RxNorm.
+    title: Medical MCP Server
+    type: server
+    image: hackathon-test-medical-mcp:latest
+    ref: ""
+    readme: https://github.com/JamesANZ/medical-mcp/blob/main/README.md
+    toolsUrl: /root/.docker/mcp/tools/medical-mcp.json
+    source: https://github.com/JamesANZ/medical-mcp/tree/main
+    upstream: https://github.com/JamesANZ/medical-mcp
+    dateAdded: "2025-09-24T00:00:00Z"
+    transport: sse
+    sseEndpoint: http://medical-mcp:8000/sse
+    tools:
+      - name: "search-drugs"
+      - name: "get-drug-details"
+      - name: "get-health-statistics"
+      - name: "get-article-details"
+      - name: "search-drug-nomenclature"
+      - name: "search-google-scholar"
+      - name: "search-clinical-guidelines"
+      - name: "check-drug-interactions"
+      - name: "search-medical-databases"
+      - name: "search-medical-journals"
+    env:
+      - name: NODE_ENV
+        value: "development"
+      - name: MCP_TIMEOUT
+        value: "30000"
+      - name: MCP_USER_AGENT
+        value: "medical-mcp/1.0.0"
+    command:
+      - npm 
+      - run
+      - start:http
+    prompts: 0
+    resources: {}
+    metadata:
+      category: healthcare
+      tags: 
+        - medical
+        - healthcare
+        - pubmed
+        - fda
+      license: ISC
+      owner: JamesANZ
