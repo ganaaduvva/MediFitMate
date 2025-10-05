@@ -1,0 +1,58 @@
+
+services:
+  medi-fit-mate:
+    build: ./medi-fit
+    image: medi-fit:latest
+    container_name: medi-fit
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mcp-gateway
+    networks:
+      - hackathon-network
+    environment:
+      - MCP_GATEWAY_URL=http://mcp-gateway:9000
+
+
+  medical-mcp:
+    build: ./medical-mcp
+    image: hackathon-test-medical-mcp:latest
+    container_name: medical-mcp
+    ports:
+      - "8000:8000"
+    networks:
+      - hackathon-network
+    environment:
+      - NODE_ENV=development
+      - MCP_TIMEOUT=30000
+      - MCP_USER_AGENT=medical-mcp/1.0.0
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+  mcp-gateway:
+    image: docker/mcp-gateway:latest
+    container_name: mcp-gateway
+    ports:
+      - "9000:9000"
+    networks:
+      - hackathon-network
+    depends_on:
+      medical-mcp:
+        condition: service_healthy
+    command:
+      - --servers=medical
+      - --catalog=/mcp/catalog.yaml
+      - --transport=sse
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./catalog.yaml:/mcp/catalog.yaml
+      - ./tools:/mcp/tools:ro
+
+
+networks:
+  hackathon-network:
+    driver: bridge
