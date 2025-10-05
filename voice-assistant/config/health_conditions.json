@@ -1,0 +1,54 @@
+{
+    "emergency_conditions": {
+        "chest_pain": {
+            "severity": "high",
+            "requires_immediate_care": true,
+            "symptoms": ["chest pressure", "shortness of breath", "sweating"],
+            "disclaimer": "If experiencing chest pain, seek emergency medical care immediately"
+        },
+        "stroke_symptoms": {
+            "severity": "high",
+            "requires_immediate_care": true,
+            "symptoms": ["facial drooping", "arm weakness", "speech difficulty"],
+            "disclaimer": "If suspecting stroke, call emergency services immediately - time is critical"
+        }
+    },
+    "chronic_conditions": {
+        "diabetes": {
+            "severity": "moderate",
+            "requires_monitoring": true,
+            "management": ["blood sugar monitoring", "medication", "diet", "exercise"],
+            "disclaimer": "Regular medical supervision required for diabetes management"
+        },
+        "hypertension": {
+            "severity": "moderate",
+            "requires_monitoring": true,
+            "management": ["blood pressure monitoring", "medication", "lifestyle changes"],
+            "disclaimer": "Regular blood pressure monitoring and medical check-ups recommended"
+        }
+    },
+    "preventive_care": {
+        "vaccination": {
+            "importance": "high",
+            "categories": ["routine", "travel", "seasonal"],
+            "disclaimer": "Follow recommended vaccination schedules from health authorities"
+        },
+        "screening": {
+            "importance": "high",
+            "types": ["cancer", "cardiovascular", "diabetes"],
+            "disclaimer": "Regular health screenings are essential for early detection"
+        }
+    },
+    "lifestyle_factors": {
+        "exercise": {
+            "importance": "high",
+            "recommendations": ["150 minutes moderate activity weekly", "strength training"],
+            "disclaimer": "Consult healthcare provider before starting new exercise program"
+        },
+        "nutrition": {
+            "importance": "high",
+            "guidelines": ["balanced diet", "portion control", "hydration"],
+            "disclaimer": "Individual dietary needs may vary, consult nutritionist if needed"
+        }
+    }
+}

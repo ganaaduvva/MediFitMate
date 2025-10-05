@@ -1,10 +1,26 @@
-livekit>=1.0.0
-livekit-api>=1.0.0
-cerebras-cloud-sdk>=0.5.0
-python-dotenv>=1.0.0
-httpx>=0.24.0
-numpy>=1.24.0
-sentence-transformers>=2.2.0
-cachetools>=5.3.0
-scikit-learn>=1.3.0  # for cosine similarity
-pydantic>=2.0.0  # for data validation
+# Core dependencies
+flask==3.0.0
+twilio==9.8.3
+python-dotenv==1.1.1
+aiohttp==3.10.5
+
+# Cerebras Integration
+cerebras-cloud-sdk==1.50.1
+
+# Audio Processing
+deepgram-sdk==2.12.0
+numpy==1.26.0
+google-cloud-texttospeech==2.14.1
+
+# Database
+SQLAlchemy==2.0.35
+psycopg2-binary==2.9.9
+alembic==1.13.2
+
+# Utilities
+requests==2.31.0
+python-multipart==0.0.6
+loguru==0.7.2
+
+# Let pip resolve httpx version automatically
+httpx>=0.28.1,<1.0.0

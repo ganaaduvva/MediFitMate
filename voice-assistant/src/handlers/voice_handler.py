@@ -1,194 +1,137 @@
-"""
-Voice Handler - Modular STT + TTS Integration
-Handles audio transcription (Deepgram) and text-to-speech (Cartesia)
-"""
 import os
-import asyncio
-import logging
 import httpx
-import json
-import wave
-import io
-from typing import Optional
+import logging
+import tempfile
+from typing import Optional, Tuple
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
-
 class VoiceHandler:
-    """Handle voice input/output with Deepgram STT and Cartesia TTS"""
-    
-    def __init__(self, deepgram_key: str, cartesia_key: str):
-        self.deepgram_key = deepgram_key
-        self.cartesia_key = cartesia_key
-        self.deepgram_url = "https://api.deepgram.com/v1/listen"
-        self.cartesia_url = "https://api.cartesia.ai/tts/bytes"
+    def __init__(self):
+        self.deepgram_api_key = os.getenv('DEEPGRAM_API_KEY')
+        self.cartesia_api_key = os.getenv('CARTESIA_API_KEY')
         
-    def is_speech(self, audio_data: bytes, threshold: float = 0.02) -> bool:
-        """
-        Detect if audio contains speech using energy-based VAD
-        
-        Args:
-            audio_data: Raw PCM audio bytes
-            threshold: Energy threshold (0-1)
-            
-        Returns:
-            True if speech detected, False otherwise
-        """
+    async def download_voice_message(self, media_url: str) -> Optional[bytes]:
+        """Download voice message from Twilio's media URL"""
         try:
-            import numpy as np
-            
-            # Convert to samples
-            samples = np.frombuffer(audio_data, dtype=np.int16)
-            
-            # Normalize to -1 to 1
-            normalized = samples.astype(np.float32) / 32768.0
-            
-            # Calculate RMS energy
-            rms = np.sqrt(np.mean(normalized ** 2))
-            
-            has_speech = rms > threshold
-            logger.info(f"🔊 Audio energy: {rms:.4f} (threshold: {threshold}) - Speech: {has_speech}")
-            
-            return has_speech
-            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(media_url)
+                if response.status_code == 200:
+                    return response.content
+                logger.error(f"Failed to download voice message: {response.status_code}")
+                return None
         except Exception as e:
-            logger.error(f"❌ VAD error: {e}")
-            return False
+            logger.error(f"Error downloading voice message: {e}")
+            return None
+    
+    async def upload_to_twilio(self, audio_data: bytes, twilio_client) -> Optional[str]:
+        """Upload audio response to Twilio for media message"""
+        try:
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
+                temp_file.write(audio_data)
+                temp_file_path = temp_file.name
+            
+            # Upload to Twilio
+            try:
+                media = twilio_client.media.v1.media_list.create(
+                    content=open(temp_file_path, 'rb'),
+                    content_type='audio/mp3'
+                )
+                return media.uri
+            finally:
+                # Clean up temp file
+                os.unlink(temp_file_path)
+                
+        except Exception as e:
+            logger.error(f"Error uploading audio to Twilio: {e}")
+            return None
     
     async def transcribe_audio(self, audio_data: bytes, sample_rate: int = 48000) -> Optional[str]:
-        """
-        Transcribe audio using Deepgram API
-        
-        Args:
-            audio_data: Raw audio bytes (PCM format)
-            sample_rate: Sample rate in Hz
-            
-        Returns:
-            Transcribed text or None if error
-        """
+        """Transcribe audio using Deepgram"""
         try:
-            # Check if audio contains speech first
             if not self.is_speech(audio_data):
-                logger.info("🔇 No speech detected, skipping transcription")
+                logger.info("No speech detected in audio")
                 return None
-            
-            logger.info(f"🎤 Transcribing audio ({len(audio_data)} bytes)...")
-            
-            # Prepare request
-            headers = {
-                "Authorization": f"Token {self.deepgram_key}",
-                "Content-Type": "audio/wav"
-            }
-            
-            params = {
-                "model": "nova-2",
-                "smart_format": "true",
-                "punctuate": "true",
-            }
-            
-            # Convert PCM to WAV format
+                
+            # Convert audio to WAV format
             wav_data = self._pcm_to_wav(audio_data, sample_rate)
             
             # Call Deepgram API
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    self.deepgram_url,
-                    headers=headers,
-                    params=params,
-                    content=wav_data
-                )
-                response.raise_for_status()
-                
-                result = response.json()
-                
-                # Extract transcript
-                if result.get("results", {}).get("channels", []):
-                    alternatives = result["results"]["channels"][0].get("alternatives", [])
-                    if alternatives:
-                        transcript = alternatives[0].get("transcript", "").strip()
-                        if transcript:
-                            logger.info(f"✅ Transcript: {transcript}")
-                            return transcript
-                        else:
-                            logger.warning("⚠️ Empty transcript")
-                            return None
-                
-                logger.warning("⚠️ No transcript in response")
+            url = "https://api.deepgram.com/v1/listen"
+            headers = {
+                "Authorization": f"Token {self.deepgram_api_key}",
+                "Content-Type": "audio/wav"
+            }
+            params = {
+                "punctuate": True,
+                "model": "general",
+                "language": "en-US"
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, params=params, content=wav_data)
+                if response.status_code == 200:
+                    result = response.json()
+                    return result['results']['channels'][0]['alternatives'][0]['transcript']
+                    
+                logger.error(f"Deepgram API error: {response.status_code}")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Transcription error: {e}", exc_info=True)
+            logger.error(f"Error transcribing audio: {e}")
             return None
     
-    async def text_to_speech(self, text: str, voice_id: str = "a0e99841-438c-4a64-b679-ae501e7d6091") -> Optional[bytes]:
-        """
-        Convert text to speech using Cartesia API
-        
-        Args:
-            text: Text to convert to speech
-            voice_id: Cartesia voice ID (default: friendly female voice)
-            
-        Returns:
-            Audio bytes (MP3 format) or None if error
-        """
+    async def text_to_speech(self, text: str) -> Optional[bytes]:
+        """Convert text to speech using Cartesia"""
         try:
-            logger.info(f"🔊 Generating speech for: {text[:50]}...")
-            
+            url = "https://api.cartesia.ai/v1/tts"
             headers = {
-                "X-API-Key": self.cartesia_key,
-                "Cartesia-Version": "2024-06-10",
+                "Authorization": f"Bearer {self.cartesia_api_key}",
                 "Content-Type": "application/json"
             }
-            
-            payload = {
-                "model_id": "sonic-english",
-                "transcript": text,
-                "voice": {
-                    "mode": "id",
-                    "id": voice_id
-                },
-                "output_format": {
-                    "container": "raw",
-                    "encoding": "pcm_s16le",
-                    "sample_rate": 48000
-                }
+            data = {
+                "text": text,
+                "voice": "en-US-Neural2-F",
+                "format": "mp3"
             }
             
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    self.cartesia_url,
-                    headers=headers,
-                    json=payload
-                )
-                response.raise_for_status()
-                
-                audio_bytes = response.content
-                logger.info(f"✅ Generated {len(audio_bytes)} bytes of audio")
-                return audio_bytes
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, json=data)
+                if response.status_code == 200:
+                    return response.content
+                    
+                logger.error(f"Cartesia API error: {response.status_code}")
+                return None
                 
         except Exception as e:
-            logger.error(f"❌ TTS error: {e}", exc_info=True)
+            logger.error(f"Error generating speech: {e}")
             return None
     
-    def _pcm_to_wav(self, pcm_data: bytes, sample_rate: int, channels: int = 1, sample_width: int = 2) -> bytes:
-        """
-        Convert raw PCM data to WAV format
+    def is_speech(self, audio_data: bytes, threshold: float = 0.02) -> bool:
+        """Detect if audio contains speech using energy-based VAD"""
+        try:
+            samples = np.frombuffer(audio_data, dtype=np.int16)
+            normalized = samples.astype(np.float32) / 32768.0
+            rms = np.sqrt(np.mean(normalized ** 2))
+            has_speech = rms > threshold
+            logger.info(f"Audio energy: {rms:.4f} (threshold: {threshold}) - Speech: {has_speech}")
+            return has_speech
+        except Exception as e:
+            logger.error(f"VAD error: {e}")
+            return False
+    
+    def _pcm_to_wav(self, pcm_data: bytes, sample_rate: int) -> bytes:
+        """Convert PCM audio data to WAV format"""
+        import wave
+        import io
         
-        Args:
-            pcm_data: Raw PCM bytes
-            sample_rate: Sample rate in Hz
-            channels: Number of audio channels (1=mono, 2=stereo)
-            sample_width: Bytes per sample (2 = 16-bit)
-            
-        Returns:
-            WAV formatted bytes
-        """
         wav_buffer = io.BytesIO()
-        
         with wave.open(wav_buffer, 'wb') as wav_file:
-            wav_file.setnchannels(channels)
-            wav_file.setsampwidth(sample_width)
+            wav_file.setnchannels(1)  # Mono
+            wav_file.setsampwidth(2)  # 16-bit
             wav_file.setframerate(sample_rate)
             wav_file.writeframes(pcm_data)
-        
-        return wav_buffer.getvalue() 
+            
+        return wav_buffer.getvalue()
