@@ -15,8 +15,8 @@ services:
 
 
   medical-mcp:
-    build: ./medical-mcp
-    image: hackathon-test-medical-mcp:latest
+    build: ./mcp-medical
+    image: mcp-medical:latest
     container_name: medical-mcp
     ports:
       - "8000:8000"
