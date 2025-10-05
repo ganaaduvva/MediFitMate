@@ -2,7 +2,7 @@ import os
 import logging
 from typing import Dict, List
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import HTMLResponse, PlainTextResponse
+# no direct response types needed here
 from google.cloud import texttospeech
 from deepgram import Deepgram
 from dotenv import load_dotenv
@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from src.models.twilio_models import TwilioMessage, UserPreference
 from src.handlers.twilio_handler import TwilioHandler
 from src.handlers.cerebras_handler import CerebrasHandler
+from src.handlers.prescription_handler import PrescriptionHandler  # Added
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,7 @@ app = FastAPI(
 # Initialize handlers
 twilio_handler = TwilioHandler(app)
 cerebras_handler = CerebrasHandler()
+prescription_handler = PrescriptionHandler()  # Added
 tts_client = texttospeech.TextToSpeechClient()
 
 # Store user preferences and conversation history (in-memory, will reset on restart)
@@ -54,8 +56,10 @@ async def handle_format_choice(
             )
     else:
         user_pref.pending_query = message.body
+        # Send the prompt to the user via REST API to ensure delivery to their WhatsApp
         return twilio_handler.create_response(
-            "How would you like to receive the response?\n\nReply with:\n1️⃣ for Text\n2️⃣ for Voice"
+            "How would you like to receive the response?\n\nReply with:\n1️⃣ for Text\n2️⃣ for Voice",
+            to=message.from_number
         )
 
 async def generate_voice_response(text: str, sender: str) -> str:
@@ -243,6 +247,25 @@ async def handle_webhook(
             response = await handle_format_choice(message, user_pref, background_tasks)
             logger.info(f"Format choice response: {response}")
             return response
+        
+        # Handle prescription image (ADDED - before voice message handling)
+        if message.num_media and int(message.num_media) > 0:
+            media_type = form_data.get('MediaContentType0', '')
+            
+            if 'image' in media_type:
+                logger.info("Image detected, processing as prescription")
+                media_url = message.media_url0
+                auth = (os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
+                
+                # Process prescription
+                result = await prescription_handler.process_prescription(media_url, auth)
+                
+                # Send response using existing handler
+                return await twilio_handler.send_message_parts(
+                    result,
+                    message.from_number,
+                    background_tasks
+                )
         
         # Handle voice message
         if message.is_voice_message:
