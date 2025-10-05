@@ -87,8 +87,8 @@ class CerebrasHandler:
             messages.append({"role": "user", "content": query})
             
             chat_completion = self.client.chat.completions.create(
-                messages=messages,
-                model=self.model,
+                    messages=messages,
+                    model=self.model,
                 max_tokens=500  # Limit response length
             )
             
