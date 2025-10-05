@@ -1,0 +1,153 @@
+[
+  {
+    "name": "search-drugs",
+    "description": "Search for drug information using FDA database",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Drug name to search for (brand name or generic name)"
+      },
+      {
+        "name": "limit",
+        "type": "number",
+        "desc": "Number of results to return (1-50, default: 10)"
+      }
+    ]
+  },
+  {
+    "name": "get-drug-details",
+    "description": "Get detailed information about a specific drug by NDC (National Drug Code)",
+    "arguments": [
+      {
+        "name": "ndc",
+        "type": "string",
+        "desc": "National Drug Code (NDC) of the drug"
+      }
+    ]
+  },
+  {
+    "name": "get-health-statistics",
+    "description": "Get health statistics and indicators from WHO Global Health Observatory",
+    "arguments": [
+      {
+        "name": "indicator",
+        "type": "string",
+        "desc": "Health indicator to search for (e.g., 'Life expectancy', 'Mortality rate')"
+      },
+      {
+        "name": "country",
+        "type": "string",
+        "desc": "Country code (e.g., 'USA', 'GBR') - optional"
+      },
+      {
+        "name": "limit",
+        "type": "number",
+        "desc": "Number of results to return (1-20, default: 10)"
+      }
+    ]
+  },
+  {
+    "name": "search-medical-literature",
+    "description": "Search for medical research articles in PubMed",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Medical topic or condition to search for"
+      },
+      {
+        "name": "max_results",
+        "type": "number",
+        "desc": "Maximum number of articles to return (1-20, default: 10)"
+      }
+    ]
+  },
+  {
+    "name": "get-article-details",
+    "description": "Get detailed information about a specific medical article by PMID",
+    "arguments": [
+      {
+        "name": "pmid",
+        "type": "string",
+        "desc": "PubMed ID (PMID) of the article"
+      }
+    ]
+  },
+  {
+    "name": "search-drug-nomenclature",
+    "description": "Search for drug information using RxNorm (standardized drug nomenclature)",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Drug name to search for in RxNorm database"
+      }
+    ]
+  },
+  {
+    "name": "search-google-scholar",
+    "description": "Search for academic research articles using Google Scholar",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Academic topic or research query to search for"
+      }
+    ]
+  },
+  {
+    "name": "search-clinical-guidelines",
+    "description": "Search for clinical guidelines and practice recommendations from medical organizations",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Medical condition or topic to search for guidelines"
+      },
+      {
+        "name": "organization",
+        "type": "string",
+        "desc": "Specific medical organization to filter by (e.g., 'American Heart Association', 'WHO')"
+      }
+    ]
+  },
+  {
+    "name": "check-drug-interactions",
+    "description": "Check for potential drug-drug interactions between two medications",
+    "arguments": [
+      {
+        "name": "drug1",
+        "type": "string",
+        "desc": "First drug name"
+      },
+      {
+        "name": "drug2",
+        "type": "string",
+        "desc": "Second drug name"
+      }
+    ]
+  },
+  {
+    "name": "search-medical-databases",
+    "description": "Search across multiple medical databases (PubMed, Google Scholar, Cochrane, ClinicalTrials.gov) for comprehensive results",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Medical topic or condition to search for across multiple databases"
+      }
+    ]
+  },
+  {
+    "name": "search-medical-journals",
+    "description": "Search specific medical journals (NEJM, JAMA, Lancet, BMJ, Nature Medicine) for high-quality research",
+    "arguments": [
+      {
+        "name": "query",
+        "type": "string",
+        "desc": "Medical topic or condition to search for in top medical journals"
+      }
+    ]
+  }
+]
