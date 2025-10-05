@@ -42,11 +42,16 @@ class TwilioHandler:
             return str(response)
             
         except Exception as e:
-            logger.error(f"Failed to send via REST API: {str(e)}")
+            logger.error(f"Failed to send via REST API: {str(e)}", exc_info=True)
+            logger.error(f"Request details: from={self.phone_number}, to=+918885229659")
             # Fallback to TwiML response
-            response = MessagingResponse()
-            response.message(message)
-            return str(response)
+            try:
+                response = MessagingResponse()
+                response.message(message)
+                return str(response)
+            except Exception as twiml_e:
+                logger.error(f"Failed to create TwiML response: {str(twiml_e)}", exc_info=True)
+                raise HTTPException(status_code=500, detail=f"Failed to send message: {str(twiml_e)}")
 
     async def send_message(self, message: str, to: str) -> str:
         """Send a single message"""
@@ -70,20 +75,67 @@ class TwilioHandler:
     ) -> str:
         """Send a voice message"""
         try:
-            from io import BytesIO
-            audio_buffer = BytesIO(audio_content)
-            audio_buffer.name = 'response.mp3'
-
-            result = self.client.messages.create(
-                body=text_description,
-                from_=f"whatsapp:{self.phone_number}",
-                to=to,
-                media_streams=[audio_buffer]
-            )
-            logger.info(f"Voice message sent successfully. SID: {result.sid}")
-            return self.create_response("")
+            from google.cloud import storage
+            import uuid
+            import tempfile
+            import os
+            
+            # Generate a unique filename
+            filename = f"voice_{uuid.uuid4()}.mp3"
+            bucket_name = "voice-agent-public"
+            
+            # Initialize storage client
+            storage_client = storage.Client()
+            
+            try:
+                # Get or create bucket
+                try:
+                    bucket = storage_client.get_bucket(bucket_name)
+                except Exception:
+                    bucket = storage_client.create_bucket(bucket_name)
+                
+                # Create a blob and upload the audio content
+                blob = bucket.blob(filename)
+                blob.upload_from_string(
+                    audio_content,
+                    content_type='audio/mpeg'
+                )
+                
+                # Make the blob public and get URL
+                blob.make_public()
+                public_url = blob.public_url
+                
+                # Send message with both text and audio
+                result = self.client.messages.create(
+                    body=text_description,
+                    from_=f"whatsapp:{self.phone_number}",
+                    to=to,
+                    media_url=[public_url]
+                )
+                logger.info(f"Voice message sent successfully. SID: {result.sid}")
+                
+                # Clean up: delete the blob after sending
+                blob.delete()
+                
+                return self.create_response("")
+                
+            except Exception as e:
+                logger.error(f"Error handling Google Cloud Storage: {str(e)}", exc_info=True)
+                # Fallback to text-only response
+                try:
+                    result = self.client.messages.create(
+                        body=text_description,
+                        from_=f"whatsapp:{self.phone_number}",
+                        to=to
+                    )
+                    logger.info(f"Fallback text message sent successfully. SID: {result.sid}")
+                    return self.create_response("")
+                except Exception as text_e:
+                    logger.error(f"Failed to send fallback text message: {str(text_e)}", exc_info=True)
+                    raise HTTPException(status_code=500, detail=f"Failed to send message: {str(text_e)}")
+            
         except Exception as e:
-            logger.error(f"Error sending voice message: {str(e)}")
+            logger.error(f"Error sending voice message: {str(e)}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Failed to send voice message: {str(e)}")
 
     def clean_markdown(self, text: str) -> str:
@@ -102,32 +154,52 @@ class TwilioHandler:
         """Split and send long messages"""
         text = self.clean_markdown(text)
         
-        if len(text) <= 1500:
+        # Use a smaller chunk size to ensure we're well under the limit
+        # accounting for part numbers and any extra characters
+        CHUNK_SIZE = 1400  # Reduced from 1500
+        
+        if len(text) <= CHUNK_SIZE:
             return self.create_response(text)
 
-        chunks = [text[i:i+1500] for i in range(0, len(text), 1500)]
+        # Split into smaller chunks at sentence boundaries when possible
+        chunks = []
+        current_chunk = ""
+        sentences = text.split('. ')
+        
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) + 2 <= CHUNK_SIZE:  # +2 for ". "
+                current_chunk += sentence + ". "
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence + ". "
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
         
         # Send first part via REST API
         try:
+            first_message = f"{chunks[0]}\n\n(Part 1/{len(chunks)})"
             result = self.client.messages.create(
-                body=chunks[0] + f"\n(Part 1/{len(chunks)})",
+                body=first_message,
                 from_=f"whatsapp:{self.phone_number}",
                 to=to
             )
             logger.info(f"Part 1/{len(chunks)} sent successfully. Message SID: {result.sid}")
         except Exception as e:
-            logger.error(f"Failed to send part 1: {str(e)}")
+            logger.error(f"Failed to send part 1: {str(e)}", exc_info=True)
             # If REST API fails, try TwiML
             response = MessagingResponse()
-            response.message(chunks[0] + f"\n(Part 1/{len(chunks)})")
+            response.message(chunks[0] + f"\n\n(Part 1/{len(chunks)})")
             return str(response)
 
         # Send remaining parts in background
-        background_tasks.add_task(
-            self._send_remaining_parts,
-            chunks=chunks,
-            to=to
-        )
+        if len(chunks) > 1:
+            background_tasks.add_task(
+                self._send_remaining_parts,
+                chunks=chunks,
+                to=to
+            )
 
         # Return empty response since we sent via REST API
         response = MessagingResponse()

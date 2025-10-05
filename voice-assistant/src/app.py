@@ -58,28 +58,66 @@ async def handle_format_choice(
             "How would you like to receive the response?\n\nReply with:\n1️⃣ for Text\n2️⃣ for Voice"
         )
 
+SUPPORTED_LANGUAGES = {
+    "en-US": {
+        "name": "en-US-Neural2-D",
+        "gender": texttospeech.SsmlVoiceGender.MALE
+    },
+    "es-ES": {
+        "name": "es-ES-Neural2-A",
+        "gender": texttospeech.SsmlVoiceGender.FEMALE
+    },
+    "fr-FR": {
+        "name": "fr-FR-Neural2-A",
+        "gender": texttospeech.SsmlVoiceGender.FEMALE
+    },
+    "de-DE": {
+        "name": "de-DE-Neural2-B",
+        "gender": texttospeech.SsmlVoiceGender.FEMALE
+    },
+    "hi-IN": {
+        "name": "hi-IN-Neural2-A",
+        "gender": texttospeech.SsmlVoiceGender.FEMALE
+    }
+}
+
 async def generate_voice_response(text: str, sender: str) -> str:
     """Generate and send voice response using Google Cloud TTS"""
     try:
         logger.info("Generating voice response...")
         
+        # Get user preferences
+        user_pref = user_preferences.get(sender, UserPreference())
+        language = user_pref.language
+        
+        # Validate language support
+        if language not in SUPPORTED_LANGUAGES:
+            logger.warning(f"Unsupported language {language}, falling back to en-US")
+            language = "en-US"
+            
+        voice_config = SUPPORTED_LANGUAGES[language]
+        
+        # Clean and prepare text
+        clean_text = twilio_handler.clean_markdown(text)
+        
         # Set the text input
         synthesis_input = texttospeech.SynthesisInput(
-            text=twilio_handler.clean_markdown(text)
+            text=clean_text
         )
 
         # Build the voice parameters
         voice = texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Neural2-D",
-            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+            language_code=language,
+            name=voice_config["name"],
+            ssml_gender=voice_config["gender"]
         )
 
         # Select the audio encoding
         audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
             speaking_rate=1.0,
-            pitch=0
+            pitch=0,
+            effects_profile_id=['telephony-class-application']
         )
 
         logger.info("Calling Google TTS...")
@@ -186,6 +224,9 @@ async def process_query(query: str, sender: str, background_tasks: BackgroundTas
     if sender not in conversation_history:
         conversation_history[sender] = []
 
+    # Get user preferences
+    user_pref = user_preferences.get(sender, UserPreference())
+    
     # Generate response using Cerebras with conversation history
     response, metadata = cerebras_handler.generate_response(
         query=query,
@@ -193,7 +234,8 @@ async def process_query(query: str, sender: str, background_tasks: BackgroundTas
         user_context={
             "platform": "whatsapp",
             "sender": sender,
-            "format": user_pref.format
+            "format": user_pref.format,
+            "language": user_pref.language  # Pass language preference
         }
     )
 
@@ -204,9 +246,20 @@ async def process_query(query: str, sender: str, background_tasks: BackgroundTas
     })
     
     # Return response in preferred format
-    if user_pref.format == 'voice':
-        return await generate_voice_response(response, sender)
-    else:
+    try:
+        if user_pref.format == 'voice':
+            logger.info(f"Generating voice response for user {sender}")
+            return await generate_voice_response(response, sender)
+        else:
+            logger.info(f"Sending text response for user {sender}")
+            return await twilio_handler.send_message_parts(
+                response,
+                sender,
+                background_tasks
+            )
+    except Exception as e:
+        logger.error(f"Error in process_query format handling: {str(e)}")
+        # Fallback to text if voice fails
         return await twilio_handler.send_message_parts(
             response,
             sender,
@@ -255,6 +308,25 @@ async def handle_webhook(
                 "How would you like to receive the response?\n\n" +
                 "Reply with:\n1️⃣ for Text\n2️⃣ for Voice"
             )
+            
+        # Handle language change command
+        if message.body.lower() in ['change language', 'switch language', 'language']:
+            language_options = "\n".join([
+                f"{i}️⃣ {lang.split('-')[0].upper()}" 
+                for i, lang in enumerate(SUPPORTED_LANGUAGES.keys(), 1)
+            ])
+            return twilio_handler.create_response(
+                "Please select your preferred language:\n\n" + language_options
+            )
+            
+        # Handle language selection
+        if message.body.isdigit() and len(message.body) == 1:
+            lang_idx = int(message.body) - 1
+            if 0 <= lang_idx < len(SUPPORTED_LANGUAGES):
+                user_pref.language = list(SUPPORTED_LANGUAGES.keys())[lang_idx]
+                return twilio_handler.create_response(
+                    f"Language set to {user_pref.language.split('-')[0].upper()}. What would you like to know?"
+                )
             
         # Process text query
         return await process_query(message.body, message.from_number, background_tasks)
