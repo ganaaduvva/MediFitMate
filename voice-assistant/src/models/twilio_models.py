@@ -29,6 +29,8 @@ class TwilioMessage(BaseModel):
         super().__init__(**data)
 
 class UserPreference(BaseModel):
-    state: str = "asking"
-    format: Optional[str] = None
+    state: str = "asking"  # asking, ready
+    format: Optional[str] = None  # text, voice
+    language: str = "en-US"  # Default to English
+    voice_name: Optional[str] = None  # Voice name for TTS
     pending_query: Optional[str] = None
