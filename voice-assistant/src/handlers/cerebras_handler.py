@@ -41,6 +41,13 @@ class CerebrasHandler:
         conversation_history: Optional[List[Dict[str, str]]] = None,
         user_context: Optional[Dict] = None
     ) -> Tuple[str, Dict]:
+        # Initialize conversation history if None
+        if conversation_history is None:
+            conversation_history = []
+            
+        # Keep last 3 exchanges for context
+        if len(conversation_history) > 3:
+            conversation_history = conversation_history[-3:]
         """
         Generate a health-focused response using Cerebras LLM
         
@@ -81,7 +88,8 @@ class CerebrasHandler:
             
             chat_completion = self.client.chat.completions.create(
                 messages=messages,
-                model=self.model
+                model=self.model,
+                max_tokens=500  # Limit response length
             )
             
             response = chat_completion.choices[0].message.content
@@ -106,26 +114,40 @@ class CerebrasHandler:
 
     def _build_system_prompt(self, user_context: Optional[Dict] = None) -> str:
         """Build a comprehensive system prompt with health focus"""
-        prompt = """You are a knowledgeable health assistant powered by Cerebras AI.
-        
-        Your core responsibilities:
-        1. Provide accurate, evidence-based health information
-        2. Use appropriate medical terminology while explaining concepts clearly
-        3. Include relevant health disclaimers and warnings
-        4. Recommend professional medical consultation when appropriate
-        5. Stay within your scope of knowledge
-        
-        Response Guidelines:
-        - Structure responses clearly with sections and bullet points
-        - Include relevant medical terms with explanations
-        - Add context-appropriate disclaimers
-        - Cite reliable health sources when possible
-        - Clearly indicate when professional medical advice is needed
-        
-        Important Disclaimers:
-        - You are not a substitute for professional medical advice
-        - Emergency situations require immediate medical attention
-        - Individual health conditions require personalized medical care
+        prompt = """You are a health and wellness assistant. Your primary goal is to provide clear, helpful information about health-related topics.
+
+        STRICT RULES:
+        1. ONLY answer health and wellness related questions
+        2. For non-health questions, politely explain that you can only assist with health topics
+        3. If a question involves emergency medical situations, ALWAYS direct to immediate medical care
+        4. Never provide specific medical treatment advice or diagnoses
+        5. For one-word responses like "yes", "no", or "okay", check previous conversation for context
+        6. If a response seems to be answering a previous question, continue that discussion
+
+        RESPONSE STRUCTURE:
+        1. First, give a clear, simple answer that anyone can understand
+        2. If using medical terms, immediately explain them in simple words
+        3. Add 1-2 practical tips or recommendations when relevant
+        4. Include a brief disclaimer when:
+           - Discussing serious health conditions
+           - Mentioning medications or treatments
+           - Addressing emergency situations
+           - Suggesting lifestyle changes
+
+        TONE AND STYLE:
+        - Use conversational, friendly language
+        - Avoid technical jargon unless necessary
+        - Be empathetic but professional
+        - Keep responses concise and focused
+        - Make complex topics easy to understand
+        - Maintain context from previous messages
+        - Reference previous answers when relevant
+
+        ALWAYS REMEMBER:
+        - You are an information resource, not a medical professional
+        - Encourage professional medical consultation when appropriate
+        - Stay within the scope of general health information
+        - Prioritize user safety and well-being
         """
         
         if user_context:
@@ -240,36 +262,56 @@ class CerebrasHandler:
         query: str,
         medical_terms: List[Dict]
     ) -> Dict:
-        """Validate response for medical accuracy and completeness"""
+        """Validate response for health focus and structure"""
         validation = {
             "is_valid": True,
-            "confidence": 0.9,  # Default high confidence
+            "confidence": 0.9,
             "warnings": [],
             "requires_disclaimer": False
         }
         
-        # Check for medical terms consistency
+        # Check if response is health-related
+        non_health_indicators = ["I can only assist with health", "I cannot provide information about"]
+        if any(indicator in response for indicator in non_health_indicators):
+            validation["is_valid"] = True  # Valid response for non-health query
+            return validation
+
+        # Check for clear explanation of medical terms
         for term in medical_terms:
-            if term["term"] not in response:
-                validation["warnings"].append(
-                    f"Response should address medical term: {term['term']}"
-                )
-                validation["confidence"] *= 0.9
+            term_loc = response.lower().find(term["term"].lower())
+            if term_loc != -1:
+                next_50_chars = response[term_loc:term_loc+50].lower()
+                if "means" not in next_50_chars and "is" not in next_50_chars:
+                    validation["warnings"].append(f"Medical term '{term['term']}' may need explanation")
+                    validation["confidence"] *= 0.9
+
 
         # Check for appropriate disclaimers
-        if any(keyword in query.lower() for keyword in ["emergency", "urgent", "severe"]):
+        emergency_keywords = ["emergency", "urgent", "severe", "critical", "life-threatening"]
+        treatment_keywords = ["medication", "treatment", "therapy", "surgery"]
+        
+        if any(keyword in query.lower() for keyword in emergency_keywords):
             validation["requires_disclaimer"] = True
-            if "emergency" not in response.lower():
+            if "seek immediate medical attention" not in response.lower():
                 validation["warnings"].append("Missing emergency disclaimer")
                 validation["confidence"] *= 0.8
 
-        # Validate response length
-        if len(response.split()) < 20:
-            validation["warnings"].append("Response may be too short")
-            validation["confidence"] *= 0.7
+        if any(keyword in response.lower() for keyword in treatment_keywords):
+            validation["requires_disclaimer"] = True
+            if "consult" not in response.lower() and "healthcare provider" not in response.lower():
+                validation["warnings"].append("Missing medical consultation disclaimer")
+                validation["confidence"] *= 0.8
+
+        # Validate response structure
+        if len(response.split()) < 50:  # Too short
+            validation["warnings"].append("Response may be too brief")
+            validation["confidence"] *= 0.8
+        elif len(response.split()) > 200:  # Too long
+            validation["warnings"].append("Response may be too detailed")
+            validation["confidence"] *= 0.9
 
         # Update final validity
-        validation["is_valid"] = validation["confidence"] > 0.6
+        validation["is_valid"] = validation["confidence"] > 0.7
         
         return validation
 

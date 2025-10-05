@@ -43,11 +43,16 @@ A specialized health and wellness assistant powered by Cerebras AI that provides
     ┌──────┴──────────────────┐
     │                         │
 ┌───┴───────────┐  ┌──────────┴─────────┐
-│  Text Path    │  │   Voice Path       │
+│  Handlers     │  │   Message Flow     │
 │               │  │                    │
-│  Cerebras     │  │  Deepgram STT     │
-│  Handler      │  │  Cerebras LLM     │
-│  (.py)        │  │  Google Cloud TTS  │
+│  Twilio       │  │  1. Parse Request  │
+│  Handler      │  │  2. Process Query  │
+│  (.py)        │  │  3. Generate Resp  │
+│               │  │  4. Format & Send  │
+│  Cerebras     │  │                    │
+│  Handler      │  │  - Text/Voice      │
+│  (.py)        │  │  - Multi-part     │
+│               │  │  - Background      │
 └───────────────┘  └────────────────────┘
 ```
 
@@ -59,14 +64,18 @@ voice-assistant/
 │   ├── app.py              # Main Flask application (webhook handler)
 │   └── handlers/
 │       ├── __init__.py
+│       ├── twilio_handler.py    # Twilio messaging integration
 │       └── cerebras_handler.py  # Cerebras LLM integration
 ├── config/                 # Configuration files
 │   ├── health_categories.json
-│   ├── medical_terms.json
-│   └── prompt_templates.json
+│   └── medical_terms.json
 ├── tests/                 # Test files
-├── requirements.txt       # Python dependencies
-└── VOICE_AGENT.md        # Documentation
+│   ├── test_twilio_handler.py   # Unit tests for Twilio handler
+│   ├── test_webhook.py          # Integration tests for webhook
+│   └── test_cerebras.py         # Tests for Cerebras integration
+├── .env                  # API keys (not in git)
+├── requirements.txt      # Python dependencies
+└── VOICE_AGENT.md       # Documentation
 ```
 
 ## 🚀 Quick Start
