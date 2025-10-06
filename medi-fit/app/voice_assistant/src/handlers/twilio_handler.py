@@ -5,10 +5,11 @@ import asyncio
 import logging
 from typing import Optional, List, Tuple
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.responses import PlainTextResponse
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 
-from src.models.twilio_models import TwilioMessage
+# TwilioMessage model is not required in this module
 
 logger = logging.getLogger(__name__)
 
@@ -17,36 +18,52 @@ class TwilioHandler:
         self.app = app
         account_sid = os.getenv('TWILIO_ACCOUNT_SID')
         auth_token = os.getenv('TWILIO_AUTH_TOKEN')
-        self.phone_number = os.getenv('TWILIO_PHONE_NUMBER')
+        phone = os.getenv('TWILIO_PHONE_NUMBER') or ''
+        # Allow env var to be set with or without the 'whatsapp:' prefix
+        phone = phone.strip()
+        if phone.lower().startswith('whatsapp:'):
+            phone = phone.split(':', 1)[1]
+        self.phone_number = phone
         
-        logger.info(f"Initializing Twilio client with account_sid: {account_sid[:6]}... and phone_number: {self.phone_number}")
+        sid_preview = f"{account_sid[:6]}..." if account_sid else "None"
+        logger.info(f"Initializing Twilio client with account_sid: {sid_preview} and phone_number: {self.phone_number}")
         if not all([account_sid, auth_token, self.phone_number]):
             raise ValueError("Missing required Twilio credentials")
             
         self.client = Client(account_sid, auth_token)
 
-    def create_response(self, message: str) -> str:
-        """Create a TwiML response"""
-        logger.info(f"Creating TwiML response with message: {message}")
-        try:
-            # First try to send via REST API
-            result = self.client.messages.create(
-                body=message,
-                from_=f"whatsapp:{self.phone_number}",
-                to="whatsapp:+918885229659"  # Your number
-            )
-            logger.info(f"Message sent via REST API. SID: {result.sid}")
-            
-            # Return empty TwiML response since we already sent the message
-            response = MessagingResponse()
-            return str(response)
-            
-        except Exception as e:
-            logger.error(f"Failed to send via REST API: {str(e)}")
-            # Fallback to TwiML response
-            response = MessagingResponse()
-            response.message(message)
-            return str(response)
+    def create_response(self, message: str, to: Optional[str] = None) -> str:
+        """Create a TwiML response.
+
+        By default this returns a TwiML reply so Twilio will send the message back
+        to the incoming sender. If `to` is provided, the method will attempt to
+        send the message directly via the REST API to that recipient and return
+        an empty TwiML response.
+        """
+        logger.info(f"Creating TwiML/REST response with message: {message} to={to}")
+
+        # If a recipient is provided, send directly via REST API
+        if to:
+            try:
+                result = self.client.messages.create(
+                    body=message,
+                    from_=f"whatsapp:{self.phone_number}",
+                    to=to
+                )
+                logger.info(f"Message sent via REST API. SID: {result.sid}")
+                # Return empty TwiML since we've already sent the message
+                response = MessagingResponse()
+                xml = str(response)
+                return PlainTextResponse(content=xml, media_type="application/xml")
+            except Exception as e:
+                logger.error(f"Failed to send via REST API: {str(e)}")
+                # Fall through to return TwiML so Twilio will still attempt a reply
+
+        # Default: return TwiML reply so Twilio sends the message to the incoming sender
+        response = MessagingResponse()
+        response.message(message)
+        xml = str(response)
+        return PlainTextResponse(content=xml, media_type="application/xml")
 
     async def send_message(self, message: str, to: str) -> str:
         """Send a single message"""
@@ -102,8 +119,11 @@ class TwilioHandler:
         """Split and send long messages"""
         text = self.clean_markdown(text)
         
+        # For short messages, prefer REST send directly to the recipient so the
+        # message appears in Twilio's outgoing message logs and is delivered to
+        # the user's WhatsApp client immediately.
         if len(text) <= 1500:
-            return self.create_response(text)
+            return self.create_response(text, to=to)
 
         chunks = [text[i:i+1500] for i in range(0, len(text), 1500)]
         
